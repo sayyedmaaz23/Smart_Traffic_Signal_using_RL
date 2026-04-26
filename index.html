@@ -6,350 +6,78 @@
 <title>Smart Traffic Signal — RL Demo</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&display=swap" rel="stylesheet"/>
 <style>
-  :root {
-    --bg:       #0a0c10;
-    --panel:    #111520;
-    --border:   #1e2a3a;
-    --accent:   #00e5ff;
-    --green:    #00ff88;
-    --red:      #ff3b5c;
-    --yellow:   #ffd600;
-    --orange:   #ff6d00;
-    --muted:    #3a4a5c;
-    --text:     #c8d8e8;
-    --mono:     'Share Tech Mono', monospace;
-    --sans:     'Barlow', sans-serif;
-  }
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Grid noise overlay */
-  body::before {
-    content: '';
-    position: fixed; inset: 0;
-    background-image:
-      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  header {
-    position: relative; z-index: 1;
-    padding: 24px 40px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 20px;
-  }
-  .logo-dot {
-    width: 12px; height: 12px; border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 12px var(--green);
-    animation: pulse 2s infinite;
-  }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-  header h1 {
-    font-family: var(--mono);
-    font-size: 1.1rem;
-    letter-spacing: 0.15em;
-    color: var(--accent);
-    text-transform: uppercase;
-  }
-  header span {
-    margin-left: auto;
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    color: var(--muted);
-  }
-
-  main {
-    position: relative; z-index: 1;
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    grid-template-rows: auto auto;
-    gap: 20px;
-    padding: 24px 40px;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-
-  /* ── Panel base ── */
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 20px;
-  }
-  .panel-title {
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.2em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 16px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  /* ── Intersection visual ── */
-  #intersection-panel { grid-row: 1 / 3; }
-
-  .intersection-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-  }
-
-  /* Lane rows */
-  .lane-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    justify-content: center;
-  }
-  .lane-label {
-    font-family: var(--mono);
-    font-size: 0.65rem;
-    color: var(--muted);
-    width: 60px;
-    text-align: right;
-    flex-shrink: 0;
-  }
-  .lane-label.right { text-align: left; }
-
-  /* Queue bar */
-  .queue-bar-wrap {
-    width: 140px;
-    height: 14px;
-    background: #0d1520;
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-  .queue-bar {
-    height: 100%;
-    width: 0%;
-    transition: width 0.4s ease, background 0.4s ease;
-    border-radius: 2px;
-  }
-
-  /* Road box */
-  .road-box {
-    width: 220px; height: 220px;
-    position: relative;
-    flex-shrink: 0;
-  }
-  /* Road surfaces */
-  .road-h, .road-v {
-    position: absolute;
-    background: #1a1f2a;
-    border: 1px solid var(--border);
-  }
-  .road-h { left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 60px; }
-  .road-v { top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 60px; }
-
-  /* Center box */
-  .center-box {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 60px; height: 60px;
-    background: #1a1f2a;
-    border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 2;
-  }
-
-  /* Signal lights */
-  .signal {
-    position: absolute;
-    display: flex;
-    gap: 5px;
-    z-index: 3;
-  }
-  .signal.ns-top    { top: 12px; left: 50%; transform: translateX(-50%); flex-direction: row; }
-  .signal.ns-bottom { bottom: 12px; left: 50%; transform: translateX(-50%); flex-direction: row; }
-  .signal.ew-left   { left: 12px; top: 50%; transform: translateY(-50%); flex-direction: column; }
-  .signal.ew-right  { right: 12px; top: 50%; transform: translateY(-50%); flex-direction: column; }
-
-  .light {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--muted);
-    transition: background 0.3s, box-shadow 0.3s;
-  }
-  .light.green-on  { background: var(--green);  box-shadow: 0 0 10px var(--green); }
-  .light.red-on    { background: var(--red);    box-shadow: 0 0 10px var(--red); }
-  .light.yellow-on { background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
-
-  /* Car dots on road */
-  .car-dots {
-    position: absolute;
-    display: flex;
-    gap: 3px;
-    z-index: 4;
-  }
-  .car-dot {
-    width: 5px; height: 5px; border-radius: 1px;
-    background: var(--accent);
-    opacity: 0.8;
-    animation: carBlink 1.5s infinite;
-  }
-  @keyframes carBlink { 0%,100%{opacity:0.8} 50%{opacity:0.3} }
-
-  /* Phase badge */
-  .phase-badge {
-    font-family: var(--mono);
-    font-size: 0.65rem;
-    padding: 2px 8px;
-    border-radius: 2px;
-    border: 1px solid;
-    letter-spacing: 0.1em;
-  }
-  .phase-0 { color: var(--green);  border-color: var(--green); }
-  .phase-1 { color: var(--accent); border-color: var(--accent); }
-  .phase-2 { color: var(--orange); border-color: var(--orange); }
-  .phase-3 { color: var(--yellow); border-color: var(--yellow); }
-
-  /* ── Controls ── */
-  #controls-panel { }
-
-  .control-row {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 14px;
-  }
-  .control-label {
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    color: var(--text);
-  }
-  .control-val {
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    color: var(--accent);
-    min-width: 36px;
-    text-align: right;
-  }
-
-  input[type=range] {
-    -webkit-appearance: none;
-    width: 120px; height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 6px var(--accent);
-  }
-
-  .btn-row { display: flex; gap: 8px; margin-top: 18px; }
-  button {
-    flex: 1;
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.1em;
-    padding: 9px 0;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.2s;
-  }
-  button:hover { border-color: var(--accent); color: var(--accent); }
-  button.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-  button.danger { border-color: var(--red); color: var(--red); }
-  button.danger:hover { background: var(--red); color: var(--bg); }
-
-  .model-toggle {
-    display: flex; gap: 0;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-bottom: 18px;
-  }
-  .model-toggle button {
-    border: none; border-radius: 0; flex: 1;
-    border-right: 1px solid var(--border);
-    font-size: 0.65rem;
-  }
-  .model-toggle button:last-child { border-right: none; }
-  .model-toggle button.active { background: var(--accent); color: var(--bg); }
-
-  /* ── Stats panel ── */
-  #stats-panel {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-  }
-  .stat-box {
-    background: #0d1520;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 12px 10px;
-    text-align: center;
-  }
-  .stat-val {
-    font-family: var(--mono);
-    font-size: 1.4rem;
-    color: var(--accent);
-    display: block;
-    line-height: 1;
-  }
-  .stat-label {
-    font-family: var(--mono);
-    font-size: 0.58rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin-top: 5px;
-    display: block;
-  }
-
-  /* ── Chart ── */
-  #chart-panel { grid-column: 1 / 3; }
-  canvas { width: 100% !important; }
-
-  /* ── Log ── */
-  #log {
-    height: 90px;
-    overflow-y: auto;
-    font-family: var(--mono);
-    font-size: 0.65rem;
-    color: var(--muted);
-    line-height: 1.8;
-    margin-top: 14px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
-  }
-  #log .entry { display: flex; gap: 10px; }
-  #log .ts { color: var(--border); }
-  #log .msg-green { color: var(--green); }
-  #log .msg-red   { color: var(--red); }
-  #log .msg-acc   { color: var(--accent); }
-
-  @media (max-width: 900px) {
-    main { grid-template-columns: 1fr; padding: 16px; }
-    #intersection-panel { grid-row: auto; }
-    #stats-panel { grid-template-columns: repeat(2,1fr); }
-    #chart-panel { grid-column: 1; }
-  }
+  :root{--bg:#0a0c10;--panel:#111520;--border:#1e2a3a;--accent:#00e5ff;--green:#00ff88;--red:#ff3b5c;--yellow:#ffd600;--orange:#ff6d00;--muted:#3a4a5c;--text:#c8d8e8;--mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif}
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+  header{position:relative;z-index:1;padding:24px 40px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:20px}
+  .logo-dot{width:12px;height:12px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  header h1{font-family:var(--mono);font-size:1.1rem;letter-spacing:.15em;color:var(--accent);text-transform:uppercase}
+  header span{margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+  #status-bar{position:relative;z-index:1;padding:8px 40px;font-family:var(--mono);font-size:.7rem;display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .status-pill{padding:3px 10px;border-radius:2px;border:1px solid;font-size:.65rem;letter-spacing:.1em;white-space:nowrap}
+  .s-ok{color:var(--green);border-color:var(--green)}
+  .s-warn{color:var(--yellow);border-color:var(--yellow)}
+  .s-err{color:var(--red);border-color:var(--red)}
+  .s-load{color:var(--muted);border-color:var(--muted)}
+  main{position:relative;z-index:1;display:grid;grid-template-columns:1fr 360px;gap:20px;padding:24px 40px;max-width:1400px;margin:0 auto}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:20px}
+  .panel-title{font-family:var(--mono);font-size:.7rem;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+  #intersection-panel{grid-row:1/3}
+  .intersection-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .lane-row{display:flex;align-items:center;gap:8px;width:100%;justify-content:center}
+  .lane-label{font-family:var(--mono);font-size:.65rem;color:var(--muted);width:60px;text-align:right;flex-shrink:0}
+  .lane-label.right{text-align:left}
+  .queue-bar-wrap{width:140px;height:14px;background:#0d1520;border:1px solid var(--border);border-radius:2px;overflow:hidden;flex-shrink:0}
+  .queue-bar{height:100%;width:0%;transition:width .4s ease,background .4s ease;border-radius:2px}
+  .road-box{width:220px;height:220px;position:relative;flex-shrink:0}
+  .road-h,.road-v{position:absolute;background:#1a1f2a;border:1px solid var(--border)}
+  .road-h{left:0;right:0;top:50%;transform:translateY(-50%);height:60px}
+  .road-v{top:0;bottom:0;left:50%;transform:translateX(-50%);width:60px}
+  .center-box{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;background:#1a1f2a;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;z-index:2}
+  .signal{position:absolute;display:flex;gap:5px;z-index:3}
+  .signal.ns-top{top:12px;left:50%;transform:translateX(-50%);flex-direction:row}
+  .signal.ns-bottom{bottom:12px;left:50%;transform:translateX(-50%);flex-direction:row}
+  .signal.ew-left{left:12px;top:50%;transform:translateY(-50%);flex-direction:column}
+  .signal.ew-right{right:12px;top:50%;transform:translateY(-50%);flex-direction:column}
+  .light{width:10px;height:10px;border-radius:50%;background:var(--muted);transition:background .3s,box-shadow .3s}
+  .light.green-on{background:var(--green);box-shadow:0 0 10px var(--green)}
+  .light.red-on{background:var(--red);box-shadow:0 0 10px var(--red)}
+  .phase-badge{font-family:var(--mono);font-size:.65rem;padding:2px 8px;border-radius:2px;border:1px solid;letter-spacing:.1em}
+  .phase-0{color:var(--green);border-color:var(--green)}
+  .phase-1{color:var(--accent);border-color:var(--accent)}
+  .phase-2{color:var(--orange);border-color:var(--orange)}
+  .phase-3{color:var(--yellow);border-color:var(--yellow)}
+  .control-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .control-label{font-family:var(--mono);font-size:.7rem;color:var(--text)}
+  .control-val{font-family:var(--mono);font-size:.7rem;color:var(--accent);min-width:40px;text-align:right}
+  input[type=range]{-webkit-appearance:none;width:110px;height:3px;background:var(--border);border-radius:2px;outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+  .btn-row{display:flex;gap:8px;margin-top:18px}
+  button{flex:1;font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;padding:9px 0;border:1px solid var(--border);border-radius:3px;background:transparent;color:var(--text);cursor:pointer;text-transform:uppercase;transition:all .2s}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  button.danger{border-color:var(--red);color:var(--red)}
+  button.danger:hover{background:var(--red);color:var(--bg)}
+  .model-toggle{display:flex;border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-bottom:18px}
+  .model-toggle button{border:none;border-radius:0;flex:1;border-right:1px solid var(--border);font-size:.65rem}
+  .model-toggle button:last-child{border-right:none}
+  .model-toggle button.active{background:var(--accent);color:var(--bg)}
+  #stats-panel{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;grid-column:1/3}
+  .stat-box{background:#0d1520;border:1px solid var(--border);border-radius:3px;padding:12px 10px;text-align:center}
+  .stat-val{font-family:var(--mono);font-size:1.4rem;color:var(--accent);display:block;line-height:1}
+  .stat-label{font-family:var(--mono);font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:5px;display:block}
+  #chart-panel{grid-column:1/3}
+  canvas{width:100%!important}
+  #log{height:90px;overflow-y:auto;font-family:var(--mono);font-size:.65rem;color:var(--muted);line-height:1.8;margin-top:14px;padding-top:10px;border-top:1px solid var(--border)}
+  #log .entry{display:flex;gap:10px}
+  #log .ts{color:var(--border)}
+  .msg-green{color:var(--green)}.msg-red{color:var(--red)}.msg-acc{color:var(--accent)}.msg-warn{color:var(--yellow)}
+  .timer-bar-wrap{width:100%;height:4px;background:#0d1520;border-radius:2px;overflow:hidden}
+  .timer-bar{height:100%;background:var(--accent);transition:width .4s linear;border-radius:2px}
+  .notice{margin-bottom:14px;padding:8px 10px;border:1px solid var(--yellow);border-radius:3px;font-family:var(--mono);font-size:.62rem;color:var(--yellow);line-height:1.7}
+  @media(max-width:900px){main{grid-template-columns:1fr;padding:16px}#intersection-panel{grid-row:auto}#stats-panel,#chart-panel{grid-column:1}}
 </style>
 </head>
 <body>
@@ -360,13 +88,22 @@
   <span id="clock">--:--:--</span>
 </header>
 
+<div id="status-bar">
+  <span style="color:var(--muted);font-size:.65rem;flex-shrink:0">MODELS:</span>
+  <span class="status-pill s-load" id="status-ql">Q-TABLE: loading...</span>
+  <span class="status-pill s-load" id="status-dqn">DQN SERVER: checking...</span>
+  <span style="margin-left:auto;color:var(--muted);font-size:.62rem">
+    
+  </span>
+</div>
+
 <main>
-  <!-- ── Intersection Visual ── -->
+
+  <!-- ── Intersection ── -->
   <div class="panel" id="intersection-panel">
     <div class="panel-title">Intersection Live View</div>
     <div class="intersection-wrap">
 
-      <!-- N lanes -->
       <div class="lane-row">
         <span class="lane-label">N-Left</span>
         <div class="queue-bar-wrap"><div class="queue-bar" id="bar-N_left"></div></div>
@@ -374,9 +111,7 @@
         <span class="lane-label right">N-Str</span>
       </div>
 
-      <!-- Road box row -->
       <div class="lane-row" style="gap:0">
-        <!-- W lanes -->
         <div style="display:flex;flex-direction:column;gap:6px;margin-right:8px;align-items:flex-end">
           <div style="display:flex;align-items:center;gap:6px">
             <span class="lane-label">W-Left</span>
@@ -388,33 +123,17 @@
           </div>
         </div>
 
-        <!-- Road SVG -->
         <div class="road-box">
-          <div class="road-h"></div>
-          <div class="road-v"></div>
+          <div class="road-h"></div><div class="road-v"></div>
           <div class="center-box">
             <span class="phase-badge phase-0" id="phase-badge">P0</span>
           </div>
-          <!-- Signals -->
-          <div class="signal ns-top">
-            <div class="light" id="sig-ns-r"></div>
-            <div class="light" id="sig-ns-g"></div>
-          </div>
-          <div class="signal ns-bottom">
-            <div class="light" id="sig-ns-r2"></div>
-            <div class="light" id="sig-ns-g2"></div>
-          </div>
-          <div class="signal ew-left">
-            <div class="light" id="sig-ew-r"></div>
-            <div class="light" id="sig-ew-g"></div>
-          </div>
-          <div class="signal ew-right">
-            <div class="light" id="sig-ew-r2"></div>
-            <div class="light" id="sig-ew-g2"></div>
-          </div>
+          <div class="signal ns-top"><div class="light" id="sig-ns-r"></div><div class="light" id="sig-ns-g"></div></div>
+          <div class="signal ns-bottom"><div class="light" id="sig-ns-r2"></div><div class="light" id="sig-ns-g2"></div></div>
+          <div class="signal ew-left"><div class="light" id="sig-ew-r"></div><div class="light" id="sig-ew-g"></div></div>
+          <div class="signal ew-right"><div class="light" id="sig-ew-r2"></div><div class="light" id="sig-ew-g2"></div></div>
         </div>
 
-        <!-- E lanes -->
         <div style="display:flex;flex-direction:column;gap:6px;margin-left:8px">
           <div style="display:flex;align-items:center;gap:6px">
             <div class="queue-bar-wrap" style="width:80px"><div class="queue-bar" id="bar-E_left"></div></div>
@@ -427,7 +146,6 @@
         </div>
       </div>
 
-      <!-- S lanes -->
       <div class="lane-row">
         <span class="lane-label">S-Left</span>
         <div class="queue-bar-wrap"><div class="queue-bar" id="bar-S_left"></div></div>
@@ -435,14 +153,18 @@
         <span class="lane-label right">S-Str</span>
       </div>
 
+      <div style="width:100%;margin-top:4px;padding:0 8px">
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:3px">
+          MIN GREEN HOLD <span id="timer-count" style="color:var(--accent)">0/5</span>
+        </div>
+        <div class="timer-bar-wrap"><div class="timer-bar" id="timer-bar" style="width:0%"></div></div>
+      </div>
     </div>
-
-    <!-- Log -->
     <div id="log"></div>
   </div>
 
   <!-- ── Controls ── -->
-  <div class="panel" id="controls-panel">
+  <div class="panel">
     <div class="panel-title">Controller Settings</div>
 
     <div class="model-toggle">
@@ -451,24 +173,33 @@
       <button id="btn-fixed" onclick="setModel('fixed')">Fixed Timer</button>
     </div>
 
+    <div class="notice" id="dqn-notice" style="display:none">
+      DQN needs server.py running locally.<br>
+      <span style="color:var(--muted)">pip install flask flask-cors<br>python server.py</span>
+    </div>
+
     <div class="control-row">
       <span class="control-label">Sim Speed</span>
       <input type="range" min="100" max="2000" value="600" step="100"
-             oninput="simSpeed=2100-this.value; speedVal.textContent=this.value+'ms'"/>
+        oninput="speedVal.textContent=this.value+'ms'"/>
       <span class="control-val" id="speedVal">600ms</span>
     </div>
-
     <div class="control-row">
       <span class="control-label">Arrival Rate</span>
       <input type="range" min="0" max="3" value="1" step="1"
-             oninput="arrivalRate=+this.value; arrVal.textContent=this.value"/>
+        oninput="arrivalRate=+this.value;arrVal.textContent=this.value"/>
       <span class="control-val" id="arrVal">1</span>
     </div>
-
+    <div class="control-row">
+      <span class="control-label">Min Green Steps</span>
+      <input type="range" min="1" max="10" value="5" step="1"
+        oninput="MIN_GREEN=+this.value;mgVal.textContent=this.value"/>
+      <span class="control-val" id="mgVal">5</span>
+    </div>
     <div class="control-row">
       <span class="control-label">Epsilon (QL)</span>
       <input type="range" min="0" max="100" value="5" step="1"
-             oninput="epsilon=this.value/100; epsVal.textContent=(this.value/100).toFixed(2)"/>
+        oninput="epsilon=this.value/100;epsVal.textContent=(this.value/100).toFixed(2)"/>
       <span class="control-val" id="epsVal">0.05</span>
     </div>
 
@@ -477,53 +208,29 @@
       <button class="danger" onclick="resetSim()">↺ Reset</button>
     </div>
 
-    <!-- Current phase info -->
-    <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border)">
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
       <div class="panel-title" style="margin-bottom:10px">Current Phase</div>
-      <div id="phase-info" style="font-family:var(--mono);font-size:0.72rem;line-height:2;color:var(--text)"></div>
+      <div id="phase-info" style="font-family:var(--mono);font-size:.72rem;line-height:2;color:var(--text)"></div>
     </div>
 
-    <!-- Q-values display -->
-    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border)">
-      <div class="panel-title" style="margin-bottom:10px">Q-Values (current state)</div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div class="panel-title" style="margin-bottom:10px">
+        Q-Values &nbsp;<span id="qval-source" style="color:var(--accent);font-size:.6rem"></span>
+      </div>
       <div id="qval-display"></div>
     </div>
   </div>
 
   <!-- ── Stats ── -->
-  <div class="panel" id="stats-panel" style="grid-column:1/3">
-    <div class="stat-box">
-      <span class="stat-val" id="stat-step">0</span>
-      <span class="stat-label">Step</span>
-    </div>
-    <div class="stat-box">
-      <span class="stat-val" id="stat-queue">0</span>
-      <span class="stat-label">Total Queue</span>
-    </div>
-    <div class="stat-box">
-      <span class="stat-val" id="stat-wait">0</span>
-      <span class="stat-label">Total Wait</span>
-    </div>
-    <div class="stat-box">
-      <span class="stat-val" id="stat-reward">0.00</span>
-      <span class="stat-label">Avg Reward</span>
-    </div>
-    <div class="stat-box">
-      <span class="stat-val" id="stat-switches">0</span>
-      <span class="stat-label">Phase Switches</span>
-    </div>
-    <div class="stat-box">
-      <span class="stat-val" id="stat-cleared">0</span>
-      <span class="stat-label">Cars Cleared</span>
-    </div>
-    <div class="stat-box">
-      <span class="stat-val" id="stat-model">QL</span>
-      <span class="stat-label">Model</span>
-    </div>
-    <div class="stat-box">
-      <span class="stat-val" id="stat-eps">0.05</span>
-      <span class="stat-label">Epsilon</span>
-    </div>
+  <div class="panel" id="stats-panel">
+    <div class="stat-box"><span class="stat-val" id="stat-step">0</span><span class="stat-label">Step</span></div>
+    <div class="stat-box"><span class="stat-val" id="stat-queue">0</span><span class="stat-label">Total Queue</span></div>
+    <div class="stat-box"><span class="stat-val" id="stat-wait">0</span><span class="stat-label">Total Wait</span></div>
+    <div class="stat-box"><span class="stat-val" id="stat-reward">0.00</span><span class="stat-label">Avg Reward</span></div>
+    <div class="stat-box"><span class="stat-val" id="stat-switches">0</span><span class="stat-label">Phase Switches</span></div>
+    <div class="stat-box"><span class="stat-val" id="stat-cleared">0</span><span class="stat-label">Cars Cleared</span></div>
+    <div class="stat-box"><span class="stat-val" id="stat-model">QL</span><span class="stat-label">Model</span></div>
+    <div class="stat-box"><span class="stat-val" id="stat-eps">0.05</span><span class="stat-label">Epsilon</span></div>
   </div>
 
   <!-- ── Chart ── -->
@@ -536,269 +243,311 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-// ── Simulation State ─────────────────────────────────────────────────────────
-const LANES = ["N_left","N_straight","S_left","S_straight","E_left","E_straight","W_left","W_straight"];
-const MAX_Q = 20;
-const PHASE_NAMES = ["NS Straight","NS Left","EW Straight","EW Left"];
-const PHASE_ACTIVE = {
-  0: ["N_straight","S_straight"],
-  1: ["N_left","S_left"],
-  2: ["E_straight","W_straight"],
-  3: ["E_left","W_left"]
-};
+// ────────────────────────────────────────────────────────────────────────────
+const LANES=["N_left","N_straight","S_left","S_straight","E_left","E_straight","W_left","W_straight"];
+const MAX_Q=20;
+const PHASE_NAMES=["NS Straight","NS Left","EW Straight","EW Left"];
+const PHASE_ACTIVE={0:["N_straight","S_straight"],1:["N_left","S_left"],2:["E_straight","W_straight"],3:["E_left","W_left"]};
+const DQN_URL='http://localhost:5050/predict';
 
-let queues = {}, waits = {}, phase = 0;
-let step = 0, totalCleared = 0, phaseSwitches = 0;
-let rewardHistory = [], avgReward = 0;
-let running = true, simSpeed = 1500, arrivalRate = 1, epsilon = 0.05;
-let currentModel = 'ql';
-let simInterval = null;
-let fixedPhaseTimer = 0;
+// ── Model state ──────────────────────────────────────────────────────────────
+let QL_TABLE={};       // loaded from q_table.json
+let qlReady=false, dqnReady=false;
+let dqnQvals=[0,0,0,0], pendingAction=null;
 
-// Simple Q-table (seeded with reasonable values for demo)
-const Q_table = {};
-function getQ(state) {
-  const k = state.join(',');
-  if (!Q_table[k]) Q_table[k] = [Math.random()*0.1, Math.random()*0.1, Math.random()*0.1, Math.random()*0.1];
-  return Q_table[k];
+// ── Sim state ────────────────────────────────────────────────────────────────
+let queues={},waits={},phase=0;
+let step=0,totalCleared=0,phaseSwitches=0;
+let rewardHistory=[],avgReward=0;
+let running=true,arrivalRate=1,epsilon=0.05;
+let currentModel='ql';
+let simInterval=null;
+let MIN_GREEN=5,phaseTimer=0;
+let fixedTimer=0;
+
+// ── Load q_table.json ─────────────────────────────────────────────────────────
+async function loadQTable(){
+  const pill=document.getElementById('status-ql');
+  try{
+    const res=await fetch('http://localhost:5050/q_table.json');
+    if(!res.ok) throw new Error();
+    QL_TABLE=await res.json();
+    // Detect key format — Python json.dump of str(tuple) → "(0, 1, 2, ...)"
+    // Our save code does json.dump({str(k): v}) where k is a tuple → "(0, 1, ...)"
+    const sample=Object.keys(QL_TABLE)[0]||'';
+    const keys=Object.keys(QL_TABLE).length;
+    pill.textContent=`Q-TABLE: ${keys.toLocaleString()} states ✓`;
+    pill.className='status-pill s-ok';
+    qlReady=true;
+    log(`Q-table loaded — ${keys.toLocaleString()} states from q_table.json`,'acc');
+  } catch(e){
+    pill.textContent='Q-TABLE: q_table.json not found';
+    pill.className='status-pill s-err';
+    log('q_table.json missing — place it in the same folder as index.html','warn');
+  }
 }
 
-function resetEnv() {
-  LANES.forEach(l => { queues[l] = Math.floor(Math.random()*5); waits[l] = 0; });
-  phase = Math.floor(Math.random()*4);
+// ── Check DQN server ──────────────────────────────────────────────────────────
+async function checkDQN(){
+  const pill=document.getElementById('status-dqn');
+  try{
+    const r=await fetch(DQN_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({state:[0,0,0,0,0,0,0,0,0]}),signal:AbortSignal.timeout(2000)});
+    if(!r.ok) throw new Error();
+    dqnReady=true;
+    pill.textContent='DQN SERVER: ready ✓ (port 5050)';
+    pill.className='status-pill s-ok';
+    log('DQN server connected — using dqn_model.pth','acc');
+  } catch(e){
+    pill.textContent='DQN SERVER: offline — run server.py';
+    pill.className='status-pill s-warn';
+  }
 }
 
-function discretize(q) {
-  if (q <= 4)  return 0;
-  if (q <= 9)  return 1;
-  if (q <= 14) return 2;
-  return 3;
+// ── Q-table lookup — handles both key formats ─────────────────────────────────
+function getQLVals(state){
+  // Format 1: "(0, 1, 2, 3, 0, 1, 2, 3, 2)"  ← Python str(tuple)
+  const k1='('+state.join(', ')+')';
+  // Format 2: "0,1,2,3,0,1,2,3,2"             ← simple join
+  const k2=state.join(',');
+  const v=QL_TABLE[k1]||QL_TABLE[k2]||null;
+  if(v) return v;
+  // Unseen state — return near-zero (matches defaultdict init)
+  return [0.001,0.001,0.001,0.001];
 }
 
-function getState() {
-  return [...LANES.map(l => discretize(queues[l])), phase];
+// ── DQN async query ───────────────────────────────────────────────────────────
+async function queryDQN(state){
+  const norm=state.map(v=>v/4.0);   // same normalization as training
+  try{
+    const r=await fetch(DQN_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({state:norm}),signal:AbortSignal.timeout(800)});
+    const d=await r.json();
+    dqnQvals=d.qvals;
+    pendingAction=d.action;
+  } catch(e){
+    if(dqnReady){
+      dqnReady=false;
+      document.getElementById('status-dqn').textContent='DQN SERVER: lost connection';
+      document.getElementById('status-dqn').className='status-pill s-err';
+    }
+  }
 }
 
-function chooseAction(state) {
-  if (currentModel === 'fixed') {
-    fixedPhaseTimer++;
-    if (fixedPhaseTimer >= 5) { fixedPhaseTimer = 0; return (phase + 1) % 4; }
+// ── Env ───────────────────────────────────────────────────────────────────────
+function resetEnv(){
+  LANES.forEach(l=>{queues[l]=Math.floor(Math.random()*5);waits[l]=0;});
+  phase=Math.floor(Math.random()*4);
+  phaseTimer=0; pendingAction=null; dqnQvals=[0,0,0,0]; fixedTimer=0;
+}
+
+function discretize(q){
+  if(q<=4) return 0; if(q<=9) return 1; if(q<=14) return 2; return 3;
+}
+
+function getState(){
+  return [...LANES.map(l=>discretize(queues[l])),phase];
+}
+
+// ── Action selection ──────────────────────────────────────────────────────────
+function chooseAction(state){
+  // Enforce minimum green — lock phase until timer expires
+  if(phaseTimer<MIN_GREEN) return phase;
+
+  if(currentModel==='fixed'){
+    fixedTimer++;
+    if(fixedTimer>=MIN_GREEN){fixedTimer=0;return(phase+1)%4;}
     return phase;
   }
-  if (Math.random() < epsilon) return Math.floor(Math.random()*4);
-  const qv = getQ(state);
+  if(currentModel==='dqn'){
+    queryDQN(state);  // fire async, use last result
+    if(dqnReady&&pendingAction!==null) return pendingAction;
+    // fallback while waiting: greedy on last qvals
+    return dqnQvals.indexOf(Math.max(...dqnQvals));
+  }
+  // Q-Learning — use real table
+  if(Math.random()<epsilon) return Math.floor(Math.random()*4);
+  const qv=getQLVals(state);
   return qv.indexOf(Math.max(...qv));
 }
 
-function simStep() {
-  const state = getState();
-  const action = chooseAction(state);
-  const isSwitch = action !== phase;
+// ── Step ──────────────────────────────────────────────────────────────────────
+function simStep(){
+  const state=getState();
+  const action=chooseAction(state);
+  const isSwitch=action!==phase;
 
-  if (isSwitch) {
-    LANES.forEach(l => waits[l] += 2);
+  if(isSwitch){
+    LANES.forEach(l=>waits[l]+=2);
     phaseSwitches++;
+    phaseTimer=0;
+  } else {
+    phaseTimer++;
   }
 
-  const active = PHASE_ACTIVE[action];
-  let cleared = 0;
-  LANES.forEach(l => {
-    if (active.includes(l)) {
-      const passed = Math.min(3, queues[l]);
-      queues[l] -= passed;
-      waits[l] = Math.max(0, waits[l] - passed);
-      cleared += passed;
+  const active=PHASE_ACTIVE[action];
+  let cleared=0;
+  LANES.forEach(l=>{
+    if(active.includes(l)){
+      const p=Math.min(3,queues[l]);
+      queues[l]-=p; waits[l]=Math.max(0,waits[l]-p); cleared+=p;
     } else {
       waits[l]++;
     }
   });
-  totalCleared += cleared;
+  totalCleared+=cleared;
 
-  LANES.forEach(l => {
-    queues[l] += Math.floor(Math.random() * (arrivalRate + 1));
-    queues[l] = Math.min(queues[l], MAX_Q);
+  LANES.forEach(l=>{
+    queues[l]+=Math.floor(Math.random()*(arrivalRate+1));
+    queues[l]=Math.min(queues[l],MAX_Q);
   });
 
-  const tq = LANES.reduce((s,l) => s + queues[l], 0);
-  const tw = LANES.reduce((s,l) => s + waits[l], 0);
-  const reward = -(tq + 0.5 * tw) / (MAX_Q * LANES.length);
+  const tq=LANES.reduce((s,l)=>s+queues[l],0);
+  const tw=LANES.reduce((s,l)=>s+waits[l],0);
+  const reward=-(tq+0.5*tw)/(MAX_Q*LANES.length);
 
-  // Simple Q-update
-  if (currentModel === 'ql') {
-    const nextState = getState();
-    const qv = getQ(state);
-    const nextQv = getQ(nextState);
-    qv[action] += 0.15 * (reward + 0.95 * Math.max(...nextQv) - qv[action]);
-  }
-
-  phase = action;
-  step++;
+  phase=action; step++;
   rewardHistory.push(reward);
-  if (rewardHistory.length > 200) rewardHistory.shift();
-  avgReward = rewardHistory.reduce((a,b)=>a+b,0) / rewardHistory.length;
+  if(rewardHistory.length>200) rewardHistory.shift();
+  avgReward=rewardHistory.reduce((a,b)=>a+b,0)/rewardHistory.length;
 
-  updateUI(tq, tw, reward, isSwitch, cleared, action, state);
+  updateUI(tq,tw,reward,isSwitch,cleared,action,state);
 }
 
-// ── UI Update ────────────────────────────────────────────────────────────────
-function queueColor(pct) {
-  if (pct < 0.35) return 'var(--green)';
-  if (pct < 0.65) return 'var(--yellow)';
-  if (pct < 0.85) return 'var(--orange)';
+//────────────────────────────────────────────────────────────────────────
+function qColor(p){
+  if(p<.35) return 'var(--green)';
+  if(p<.65) return 'var(--yellow)';
+  if(p<.85) return 'var(--orange)';
   return 'var(--red)';
 }
 
-function updateUI(tq, tw, reward, isSwitch, cleared, action, state) {
-  // Bars
-  LANES.forEach(l => {
-    const pct = queues[l] / MAX_Q * 100;
-    const bar = document.getElementById('bar-' + l);
-    if (bar) { bar.style.width = pct + '%'; bar.style.background = queueColor(pct/100); }
+function updateUI(tq,tw,reward,isSwitch,cleared,action,state){
+  LANES.forEach(l=>{
+    const p=queues[l]/MAX_Q;
+    const b=document.getElementById('bar-'+l);
+    if(b){b.style.width=(p*100)+'%';b.style.background=qColor(p);}
   });
 
-  // Signals
-  const nsOn = action === 0 || action === 1;
-  const ewOn = action === 2 || action === 3;
-  setSignal('ns', nsOn, isSwitch);
-  setSignal('ew', ewOn, isSwitch);
+  setSignal('ns',action===0||action===1);
+  setSignal('ew',action===2||action===3);
 
-  // Phase badge
-  const badge = document.getElementById('phase-badge');
-  badge.textContent = 'P' + action;
-  badge.className = 'phase-badge phase-' + action;
+  const badge=document.getElementById('phase-badge');
+  badge.textContent='P'+action;
+  badge.className='phase-badge phase-'+action;
 
-  // Stats
-  document.getElementById('stat-step').textContent    = step;
-  document.getElementById('stat-queue').textContent   = tq;
-  document.getElementById('stat-wait').textContent    = tw;
-  document.getElementById('stat-reward').textContent  = avgReward.toFixed(3);
-  document.getElementById('stat-switches').textContent= phaseSwitches;
-  document.getElementById('stat-cleared').textContent = totalCleared;
-  document.getElementById('stat-model').textContent   = currentModel.toUpperCase();
-  document.getElementById('stat-eps').textContent     = epsilon.toFixed(2);
+  const tp=Math.min(100,(phaseTimer/MIN_GREEN)*100);
+  document.getElementById('timer-bar').style.width=tp+'%';
+  document.getElementById('timer-bar').style.background=phaseTimer>=MIN_GREEN?'var(--green)':'var(--accent)';
+  document.getElementById('timer-count').textContent=Math.min(phaseTimer,MIN_GREEN)+'/'+MIN_GREEN;
 
-  // Phase info
-  document.getElementById('phase-info').innerHTML =
+  document.getElementById('stat-step').textContent=step;
+  document.getElementById('stat-queue').textContent=tq;
+  document.getElementById('stat-wait').textContent=tw;
+  document.getElementById('stat-reward').textContent=avgReward.toFixed(3);
+  document.getElementById('stat-switches').textContent=phaseSwitches;
+  document.getElementById('stat-cleared').textContent=totalCleared;
+  document.getElementById('stat-model').textContent=currentModel.toUpperCase();
+  document.getElementById('stat-eps').textContent=currentModel==='fixed'?'N/A':epsilon.toFixed(2);
+
+  document.getElementById('phase-info').innerHTML=
     `<span style="color:var(--accent)">${PHASE_NAMES[action]}</span><br>
      Active: ${PHASE_ACTIVE[action].join(', ')}<br>
-     Switch: ${isSwitch ? '<span style="color:var(--yellow)">YES (+2 wait)</span>' : '<span style="color:var(--green)">NO</span>'}`;
+     Switch: ${isSwitch?'<span class="msg-warn">YES (+2 wait)</span>':'<span class="msg-green">NO</span>'}<br>
+     Held: <span style="color:var(--accent)">${phaseTimer}</span> / ${MIN_GREEN} steps`;
 
-  // Q-values
-  const qv = getQ(state);
-  const best = Math.max(...qv);
-  document.getElementById('qval-display').innerHTML = PHASE_NAMES.map((n,i) =>
+  // Q-values from real model
+  let qv,src;
+  if(currentModel==='dqn'){
+    qv=dqnQvals; src=dqnReady?'← dqn_model.pth':'← server offline';
+  } else if(currentModel==='ql'){
+    qv=getQLVals(state); src=qlReady?'← q_table.json':'← q_table.json not loaded';
+  } else {
+    qv=[.25,.25,.25,.25]; src='← fixed timer';
+  }
+  document.getElementById('qval-source').textContent=src;
+
+  const best=Math.max(...qv), mn=Math.min(...qv), rng=Math.max(.0001,best-mn);
+  document.getElementById('qval-display').innerHTML=PHASE_NAMES.map((n,i)=>
     `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-      <span style="font-family:var(--mono);font-size:0.62rem;color:var(--muted);width:80px">${n}</span>
+      <span style="font-family:var(--mono);font-size:.62rem;color:var(--muted);width:80px">${n}</span>
       <div style="flex:1;height:6px;background:#0d1520;border:1px solid var(--border);border-radius:2px;overflow:hidden">
-        <div style="height:100%;width:${Math.min(100,Math.abs(qv[i])*400)}%;background:${i===action?'var(--accent)':'var(--muted)'};transition:width 0.3s"></div>
+        <div style="height:100%;width:${Math.max(4,((qv[i]-mn)/rng)*100)}%;background:${i===action?'var(--accent)':'var(--muted)'};transition:width .3s"></div>
       </div>
-      <span style="font-family:var(--mono);font-size:0.6rem;color:${i===best?'var(--accent)':'var(--muted)'};width:40px;text-align:right">${qv[i].toFixed(3)}</span>
+      <span style="font-family:var(--mono);font-size:.6rem;color:${qv[i]===best?'var(--accent)':'var(--muted)'};width:50px;text-align:right">${qv[i].toFixed(4)}</span>
     </div>`
   ).join('');
 
-  // Chart
-  rewardChart.data.labels = rewardHistory.map((_,i)=>i);
-  rewardChart.data.datasets[0].data = rewardHistory;
+  rewardChart.data.labels=rewardHistory.map((_,i)=>i);
+  rewardChart.data.datasets[0].data=rewardHistory;
   rewardChart.update('none');
 
-  // Log
-  if (isSwitch || step % 10 === 0) addLog(action, reward, cleared, isSwitch);
-
-  // Clock
-  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+  if(isSwitch||step%10===0) addLogEntry(action,reward,cleared,isSwitch);
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString();
 }
 
-function setSignal(dir, green, yellow) {
-  const suffix = yellow ? 'y' : (green ? 'g' : 'r');
-  if (dir === 'ns') {
-    ['sig-ns-r','sig-ns-r2'].forEach(id => {
-      const el = document.getElementById(id);
-      el.className = 'light' + ((!green && !yellow) ? ' red-on' : '');
-    });
-    ['sig-ns-g','sig-ns-g2'].forEach(id => {
-      const el = document.getElementById(id);
-      el.className = 'light' + (green ? ' green-on' : '');
-    });
-  } else {
-    ['sig-ew-r','sig-ew-r2'].forEach(id => {
-      const el = document.getElementById(id);
-      el.className = 'light' + ((!green && !yellow) ? ' red-on' : '');
-    });
-    ['sig-ew-g','sig-ew-g2'].forEach(id => {
-      const el = document.getElementById(id);
-      el.className = 'light' + (green ? ' green-on' : '');
-    });
-  }
+function setSignal(dir,green){
+  const r=dir==='ns'?['sig-ns-r','sig-ns-r2']:['sig-ew-r','sig-ew-r2'];
+  const g=dir==='ns'?['sig-ns-g','sig-ns-g2']:['sig-ew-g','sig-ew-g2'];
+  r.forEach(id=>document.getElementById(id).className='light'+((!green)?' red-on':''));
+  g.forEach(id=>document.getElementById(id).className='light'+(green?' green-on':''));
 }
 
-let logEntries = [];
-function addLog(action, reward, cleared, sw) {
-  const ts = new Date().toLocaleTimeString('en',{hour12:false});
-  const cls = sw ? 'msg-yellow' : (reward > -0.3 ? 'msg-green' : 'msg-red');
-  logEntries.unshift(`<div class="entry"><span class="ts">${ts}</span><span class="${cls}">Step ${step} → ${PHASE_NAMES[action]} | reward ${reward.toFixed(3)} | cleared ${cleared}</span></div>`);
-  if (logEntries.length > 20) logEntries.pop();
-  document.getElementById('log').innerHTML = logEntries.join('');
+let logEntries=[];
+function log(msg,cls='acc'){
+  const ts=new Date().toLocaleTimeString('en',{hour12:false});
+  logEntries.unshift(`<div class="entry"><span class="ts">${ts}</span><span class="msg-${cls}">${msg}</span></div>`);
+  if(logEntries.length>20) logEntries.pop();
+  document.getElementById('log').innerHTML=logEntries.join('');
+}
+function addLogEntry(action,reward,cleared,sw){
+  const cls=sw?'warn':(reward>-0.3?'green':'red');
+  log(`Step ${step} → ${PHASE_NAMES[action]} | r=${reward.toFixed(3)} | cleared ${cleared}`,cls);
 }
 
-// ── Chart Setup ──────────────────────────────────────────────────────────────
-const ctx = document.getElementById('rewardChart').getContext('2d');
-const rewardChart = new Chart(ctx, {
-  type: 'line',
-  data: {
-    labels: [],
-    datasets: [{
-      data: [],
-      borderColor: '#00e5ff',
-      borderWidth: 1.5,
-      pointRadius: 0,
-      fill: true,
-      backgroundColor: 'rgba(0,229,255,0.05)',
-      tension: 0.3
-    }]
-  },
-  options: {
-    animation: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { display: false },
-      y: {
-        grid: { color: '#1e2a3a' },
-        ticks: { color: '#3a4a5c', font: { family: 'Share Tech Mono', size: 10 } }
-      }
-    }
-  }
+// ── Chart ─────────────────────────────────────────────────────────────────────
+const ctx=document.getElementById('rewardChart').getContext('2d');
+const rewardChart=new Chart(ctx,{
+  type:'line',
+  data:{labels:[],datasets:[{data:[],borderColor:'#00e5ff',borderWidth:1.5,
+    pointRadius:0,fill:true,backgroundColor:'rgba(0,229,255,0.05)',tension:.3}]},
+  options:{animation:false,plugins:{legend:{display:false}},
+    scales:{x:{display:false},y:{grid:{color:'#1e2a3a'},
+      ticks:{color:'#3a4a5c',font:{family:'Share Tech Mono',size:10}}}}}
 });
 
-// ── Controls ─────────────────────────────────────────────────────────────────
-function setModel(m) {
-  currentModel = m;
-  ['ql','dqn','fixed'].forEach(id => {
-    document.getElementById('btn-'+id).classList.toggle('active', id===m);
-  });
-  addLog(phase, 0, 0, false);
+// ── Controls ──────────────────────────────────────────────────────────────────
+function setModel(m){
+  currentModel=m;
+  ['ql','dqn','fixed'].forEach(id=>
+    document.getElementById('btn-'+id).classList.toggle('active',id===m));
+  document.getElementById('dqn-notice').style.display=
+    (m==='dqn'&&!dqnReady)?'block':'none';
+  log(`Switched to ${m.toUpperCase()} controller`,'acc');
 }
 
-function toggleSim() {
-  running = !running;
-  document.getElementById('btn-run').textContent = running ? '⏸ Pause' : '▶ Run';
-  document.getElementById('btn-run').classList.toggle('active', running);
+function toggleSim(){
+  running=!running;
+  document.getElementById('btn-run').textContent=running?'⏸ Pause':'▶ Run';
+  document.getElementById('btn-run').classList.toggle('active',running);
 }
 
-function resetSim() {
+function resetSim(){
   clearInterval(simInterval);
-  step = 0; totalCleared = 0; phaseSwitches = 0;
-  rewardHistory = []; avgReward = 0; logEntries = [];
+  step=0;totalCleared=0;phaseSwitches=0;rewardHistory=[];avgReward=0;logEntries=[];
   resetEnv();
   startSim();
 }
 
-function startSim() {
+function startSim(){
   clearInterval(simInterval);
-  simInterval = setInterval(() => { if (running) simStep(); }, 600);
+  simInterval=setInterval(()=>{if(running) simStep();},600);
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 resetEnv();
+loadQTable();
+checkDQN();
 startSim();
 </script>
 </body>
